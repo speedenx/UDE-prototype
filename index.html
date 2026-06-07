@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniCircle - Interactive Prototype</title>
+    <style>
+        /* --- Base Setup --- */
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        
+        #app-container {
+            width: 375px; height: 812px; background-color: #f8f9fa; border-radius: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; position: relative;
+            display: flex; flex-direction: column; border: 8px solid #ffffff;
+        }
+
+        /* --- Screens --- */
+        .screen { display: none; flex: 1; padding: 24px; overflow-y: auto; padding-bottom: 100px; }
+        .screen.active { display: block; }
+
+        /* --- Typography --- */
+        h1 { font-size: 24px; color: #111; margin: 0 0 8px 0; }
+        h2 { font-size: 18px; color: #111; margin: 20px 0 12px 0; }
+        p { font-size: 14px; color: #555; line-height: 1.4; margin-top: 0; }
+        .brand { color: #6b4eff; font-weight: bold; font-size: 16px; margin-bottom: 16px; }
+        .text-sm { font-size: 12px; color: #777; }
+
+        /* --- Reusable UI Components --- */
+        .card { background: white; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 16px; border: 1px solid #eee; transition: all 0.2s; }
+        .card-highlight { border: 2px solid #6b4eff; border-radius: 20px; }
+        .card-danger { background-color: #ffebee; border-color: #ffcdd2; color: #c62828; }
+        .clickable-card:active { transform: scale(0.98); }
+        
+        /* Layout Utilities */
+        .flex { display: flex; }
+        .flex-col { display: flex; flex-direction: column; }
+        .justify-between { justify-content: space-between; }
+        .align-center { align-items: center; }
+        .gap-2 { gap: 8px; }
+        .gap-3 { gap: 12px; }
+        .gap-4 { gap: 16px; }
+        .wrap { flex-wrap: wrap; }
+
+        /* Buttons & Inputs */
+        .btn-primary { background-color: #6b4eff; color: white; border: none; padding: 16px; width: 100%; border-radius: 24px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
+        .btn-primary:active { opacity: 0.8; }
+        .btn-secondary { background-color: transparent; color: #333; border: 1px solid #ddd; padding: 16px; width: 100%; border-radius: 24px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s;}
+        .btn-secondary:active { background: #f0f0f5; }
+        .btn-pill { border: 1px solid #ddd; background: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; color: #555; transition: all 0.2s; }
+        .btn-pill.active { border-color: #6b4eff; background: #f0edff; color: #6b4eff; }
+        
+        .badge { background: #f0f0f5; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; color: #333; }
+        .avatar { width: 40px; height: 40px; border-radius: 20px; background: #e0d4ff; color: #6b4eff; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 14px; }
+        input[type="text"] { width: 100%; padding: 12px 16px; border-radius: 20px; border: 1px solid #ddd; font-size: 14px; outline: none; }
+        
+        /* Interactive Specific Styles */
+        .emoji-select { cursor: pointer; padding: 8px 2px; border-radius: 16px; transition: background 0.2s; flex: 1; align-items: center; justify-content: center; overflow: hidden; }
+        .emoji-select .text-sm { font-size: 10px; letter-spacing: -0.3px; }        .emoji-select.active { background: #e0d4ff; }
+        .emoji-select.active .text-sm { color: #6b4eff; font-weight: bold; }
+        
+        .chat-bubble { padding:12px 16px; border-radius:16px; max-width:85%; margin-bottom:12px; font-size: 14px; line-height: 1.4; }
+        .chat-ai { background:#f0edff; border-bottom-left-radius:4px; align-self: flex-start; color: #333;}
+        .chat-user { background:white; border:1px solid #ddd; border-bottom-right-radius:4px; align-self:flex-end; color:#333; }
+        
+        .quest-done { opacity: 0.5; pointer-events: none; }
+
+        /* --- Bottom Navigation --- */
+        #bottom-nav { position: absolute; bottom: 16px; left: 16px; right: 16px; background: white; border-radius: 30px; display: flex; justify-content: space-between; padding: 12px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .nav-item { text-align: center; font-size: 10px; color: #999; cursor: pointer; flex: 1; transition: color 0.2s;}
+        .nav-item.active { color: #6b4eff; }
+        .nav-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+
+        <div id="screen-checkin" class="screen active">
+            <div class="brand">UniCircle</div>
+            <h1>How are you feeling today?</h1>
+            <p>Use the emoji scale to quickly check in.</p>
+            
+            <div class="card">
+                <p><strong>Mood level</strong></p>
+                <div class="flex justify-between" id="mood-container">
+                    <div class="flex-col align-center emoji-select" onclick="selectMood(this)"><span style="font-size:32px;">😄</span><span class="text-sm">Good</span></div>
+                    <div class="flex-col align-center emoji-select" onclick="selectMood(this)"><span style="font-size:32px;">🙂</span><span class="text-sm">Okay</span></div>
+                    <div class="flex-col align-center emoji-select" onclick="selectMood(this)"><span style="font-size:32px;">😐</span><span class="text-sm">Meh</span></div>
+                    <div class="flex-col align-center emoji-select active" onclick="selectMood(this)"><span style="font-size:32px;">😟</span><span class="text-sm">Stressed</span></div>
+                    <div class="flex-col align-center emoji-select" onclick="selectMood(this)"><span style="font-size:32px;">😫</span><span class="text-sm">Overwhelmed</span></div>
+                </div>
+            </div>
+
+            <h2>What is affecting you most?</h2>
+            <div class="flex wrap gap-2" id="stressor-container">
+                <button class="btn-pill active" onclick="togglePill(this, 'stressor')">Assignments</button>
+                <button class="btn-pill" onclick="togglePill(this, 'stressor')">Exams</button>
+                <button class="btn-pill" onclick="togglePill(this, 'stressor')">Sleep</button>
+                <button class="btn-pill" onclick="togglePill(this, 'stressor')">Loneliness</button>
+            </div>
+
+            <h2>What would help right now?</h2>
+            <div class="flex wrap gap-2" id="help-container">
+                <button class="btn-pill active" onclick="togglePill(this, 'help')">Quiet company</button>
+                <button class="btn-pill" onclick="togglePill(this, 'help')">Mentor advice</button>
+                <button class="btn-pill" onclick="togglePill(this, 'help')">AI chat first</button>
+            </div>
+
+            <button class="btn-primary" onclick="navigateTo('screen-identity')" style="margin-top: 30px;">Build my support path</button>
+            <button class="btn-secondary" onclick="navigateNav('screen-rooms', document.getElementById('nav-rooms'))">Browse quietly</button>
+        </div>
+
+        <div id="screen-identity" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Set up your safe identity</h1>
+            <p>Choose how you appear to others.</p>
+            
+            <div class="card flex align-center gap-4">
+                <div class="avatar" style="width: 60px; height: 60px; font-size: 20px;">CO</div>
+                <div style="flex:1;">
+                    <p style="margin:0; font-size:12px;">Nickname</p>
+                    <input type="text" id="nickname-input" value="CloudOtter24" style="background:#f4f4f9; border:none; margin-top:4px;">
+                </div>
+            </div>
+
+            <h2>Preferred support tone</h2>
+            <div class="flex wrap gap-2" id="tone-container">
+                <button class="btn-pill active" onclick="selectTone(this, 'Gentle')">Gentle</button>
+                <button class="btn-pill" onclick="selectTone(this, 'Practical')">Practical</button>
+                <button class="btn-pill" onclick="selectTone(this, 'Direct')">Direct</button>
+            </div>
+
+            <div class="card" style="background-color: #e8f5e9; border-color: #c8e6c9; margin-top: 24px;">
+                <p style="color: #2e7d32; font-weight: bold; margin-bottom: 4px;">Tone preview</p>
+                <p style="color: #388e3c; margin: 0;" id="tone-preview">"You showed up today. Let's take one small step together."</p>
+            </div>
+
+            <button class="btn-primary" onclick="navigateTo('screen-guided-path')" style="margin-top: 40px;">Continue to support path</button>
+        </div>
+
+        <div id="screen-guided-path" class="screen">
+            <div class="brand flex justify-between align-center">UniCircle <span style="font-size:24px;">👤</span></div>
+            <h1>Your Guided Support Path</h1>
+            <p>Suggested because you checked in today.</p>
+
+            <div class="card card-highlight">
+                <p class="text-sm" style="color:#6b4eff; margin-bottom:4px; font-weight:bold;">Recommended path</p>
+                <h2 style="margin:0 0 12px 0;">Deadline Survival Path</h2>
+                <div class="flex gap-2">
+                    <span class="btn-pill active">Quiet-friendly</span>
+                    <span class="btn-pill">Academic stress</span>
+                </div>
+            </div>
+
+            <h2>Today's 3 small steps</h2>
+            <div class="card clickable-card flex align-center gap-3" onclick="navigateNav('screen-rooms', document.getElementById('nav-rooms'))">
+                <div class="avatar" style="background:white; border:1px solid #6b4eff; color:#6b4eff;">1</div>
+                <div>
+                    <p style="margin:0; font-weight:bold;">Join a quiet study room</p>
+                    <p class="text-sm" style="margin:0;">Study alongside others without pressure.</p>
+                </div>
+            </div>
+            <div class="card clickable-card flex align-center gap-3" onclick="navigateNav('screen-mentors', document.getElementById('nav-mentors'))">
+                <div class="avatar" style="background:white; border:1px solid #6b4eff; color:#6b4eff;">2</div>
+                <div>
+                    <p style="margin:0; font-weight:bold;">Ask a mentor if stuck</p>
+                    <p class="text-sm" style="margin:0;">Use a prompt to ask for guidance.</p>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="navigateNav('screen-rooms', document.getElementById('nav-rooms'))">Start with quiet study</button>
+            <button class="btn-secondary" onclick="navigateTo('screen-checkin')">Redo Check-in</button>
+        </div>
+
+        <div id="screen-rooms" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Choose a study room</h1>
+            <p>Rooms show pax count, limits, and mentor status.</p>
+
+            <div class="card clickable-card" onclick="navigateTo('screen-room-detail')">
+                <div class="flex justify-between align-center mb-2">
+                    <h2 style="margin:0;">Quiet Co-study</h2>
+                    <span class="badge" id="room-pax">18/25</span>
+                </div>
+                <p class="text-sm" style="margin-top:4px;">No mic/camera. Watch others study for motivation.</p>
+                <div class="flex gap-2 align-center">
+                    <span class="btn-pill active" style="padding:4px 8px;">Quiet</span>
+                    <span class="text-sm">• Mentor on duty</span>
+                </div>
+            </div>
+
+            <div class="card clickable-card" onclick="alert('This is a demo room. Try the Quiet Co-study room above!')">
+                <div class="flex justify-between align-center">
+                    <h2 style="margin:0;">Music Study Room</h2>
+                    <span class="badge">11/20</span>
+                </div>
+                <p class="text-sm" style="margin-top:4px;">Low-volume lofi music. Chat optional.</p>
+            </div>
+            
+            <div class="flex gap-2" style="margin-top:20px;">
+                <button class="btn-primary flex-1" style="margin:0;" onclick="navigateTo('screen-circles')">Peer Circles</button>
+            </div>
+        </div>
+
+        <div id="screen-room-detail" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Quiet Co-study Room</h1>
+            <p>A low-pressure room for students who want to study alongside others.</p>
+
+            <div class="card text-center" style="padding: 24px;">
+                <h1 style="font-size:32px;" id="room-detail-pax">18 / 25 students inside</h1>
+                <p class="text-sm">No mic • No camera • Reaction-only</p>
+                <div class="flex justify-center gap-2 mt-3">
+                    <span class="btn-pill" style="background:#e8f5e9; color:#2e7d32; border:none;">Mentor online</span>
+                </div>
+            </div>
+
+            <h2>Before joining</h2>
+            <div class="flex-col gap-2">
+                <div class="card" style="padding:12px; margin:0; cursor:pointer;" onclick="this.style.background='#e8f5e9'">✓ I understand this is moderated</div>
+                <div class="card" style="padding:12px; margin:0; cursor:pointer;" onclick="this.style.background='#e8f5e9'">✓ I can report disruption</div>
+            </div>
+
+            <button class="btn-primary" style="margin-top:30px;" onclick="joinRoom(this)">Enter room anonymously</button>
+            <button class="btn-secondary" onclick="navigateTo('screen-rooms')">Back to rooms</button>
+        </div>
+
+        <div id="screen-circles" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Peer circles</h1>
+            <p>Supportive groups based on interests and needs.</p>
+
+            <div class="card clickable-card" onclick="alert('Joined Coding Buddies!')">
+                <h2 style="margin:0 0 4px 0;">Coding Buddies</h2>
+                <p class="text-sm">Programming help + quiet co-working</p>
+                <div class="flex gap-2">
+                    <span class="btn-pill">32 members</span>
+                    <span class="btn-pill">Moderated</span>
+                </div>
+            </div>
+
+            <div class="card clickable-card" onclick="alert('Joined Anime Chill Circle!')">
+                <h2 style="margin:0 0 4px 0;">Anime Chill Circle</h2>
+                <p class="text-sm">Low-pressure chat and study breaks</p>
+                <div class="flex gap-2">
+                    <span class="btn-pill active">Quiet join</span>
+                </div>
+            </div>
+
+            <div class="flex gap-2" style="margin-top: 30px;">
+                <button class="btn-secondary" style="margin:0;" onclick="alert('Create circle feature coming soon!')">Create a circle</button>
+                <button class="btn-primary" style="margin:0;" onclick="navigateTo('screen-rooms')">Back to Rooms</button>
+            </div>
+        </div>
+
+        <div id="screen-mentors" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Find a mentor</h1>
+            <input type="text" placeholder="Search by topic, module, language..." style="margin-bottom: 20px;" onkeyup="alert('Search functionality is simulated.')">
+
+            <div class="card clickable-card flex gap-3" onclick="alert('Request sent to Alicia Tan!')">
+                <div class="avatar" style="width:50px; height:50px;">AT</div>
+                <div style="flex:1;">
+                    <h2 style="margin:0 0 4px 0;">Alicia Tan</h2>
+                    <p class="text-sm">Academic mentor • Python, study planning</p>
+                    <div class="flex justify-between align-center">
+                        <span class="btn-pill active" style="padding:4px 12px;">Saved</span>
+                        <span class="text-sm" style="color:#6b4eff;">Available today</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card clickable-card flex gap-3" onclick="alert('Request sent to Ravi S!')">
+                <div class="avatar" style="width:50px; height:50px; background:#e3f2fd; color:#1565c0;">RS</div>
+                <div style="flex:1;">
+                    <h2 style="margin:0 0 4px 0;">Ravi S.</h2>
+                    <p class="text-sm">Peer wellbeing guide • Stress, loneliness</p>
+                    <span class="btn-pill" style="padding:4px 12px;">New</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-ai" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>AI first-step chat</h1>
+            
+            <div class="flex gap-2 mb-4" style="margin-bottom:20px;" id="ai-tone-container">
+                <button class="btn-pill active" onclick="switchAITone(this)">Gentle</button>
+                <button class="btn-pill" onclick="switchAITone(this)">Practical</button>
+                <button class="btn-pill" onclick="switchAITone(this)">Direct</button>
+            </div>
+
+            <div class="flex-col gap-2" id="chat-window">
+                <div class="chat-bubble chat-ai">
+                    <p style="margin:0; font-weight:bold; font-size:12px; margin-bottom:4px; color:#6b4eff;">AI Buddy</p>
+                    <p style="margin:0;">Hey there, want to talk through what feels hardest right now?</p>
+                </div>
+            </div>
+
+            <div class="flex gap-2 align-center" style="margin-top:20px;">
+                <input type="text" id="ai-input" placeholder="Type here..." onkeypress="handleChatEnter(event)">
+                <button class="btn-primary" style="margin-top:0; width:80px; border-radius:20px; padding:12px;" onclick="sendChatMessage()">Send</button>
+            </div>
+            
+            <button class="btn-secondary" onclick="navigateNav('screen-mentors', document.getElementById('nav-mentors'))">Escalate to human mentor</button>
+        </div>
+
+        <div id="screen-quests" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Small quests, small wins</h1>
+            <p>Complete tasks to earn Calm Coins.</p>
+
+            <div class="card card-highlight text-center" style="padding:24px;">
+                <p class="text-sm" style="margin:0;">Today's balance</p>
+                <h1 style="color:#6b4eff; font-size:36px; margin:4px 0;" id="coin-balance">120 Coins</h1>
+            </div>
+
+            <div class="card flex justify-between align-center clickable-card" onclick="completeQuest(this, 20)">
+                <div>
+                    <h2 style="margin:0 0 4px 0;">25-min focus session</h2>
+                    <span class="btn-pill" style="padding:2px 8px;">Study</span>
+                </div>
+                <div style="color:#6b4eff; font-weight:bold;">+20</div>
+            </div>
+
+            <div class="card flex justify-between align-center clickable-card" onclick="completeQuest(this, 10)">
+                <div>
+                    <h2 style="margin:0 0 4px 0;">5-min stretch break</h2>
+                    <span class="btn-pill" style="padding:2px 8px;">Rest</span>
+                </div>
+                <div style="color:#6b4eff; font-weight:bold;">+10</div>
+            </div>
+
+            <h2>Profile shop preview</h2>
+            <div class="flex gap-2 justify-between">
+                <div class="card flex-1 text-center clickable-card" style="padding:12px;" onclick="buyItem(50, 'Badge')"><div style="font-size:24px;">🥇</div><p class="text-sm mb-0">50 Coins</p></div>
+                <div class="card flex-1 text-center clickable-card" style="padding:12px;" onclick="buyItem(30, 'Icon')"><div style="font-size:24px;">🌙</div><p class="text-sm mb-0">30 Coins</p></div>
+                <div class="card flex-1 text-center clickable-card" style="padding:12px;" onclick="buyItem(100, 'Pet')"><div style="font-size:24px;">🐱</div><p class="text-sm mb-0">100 Coins</p></div>
+            </div>
+            
+            <button class="btn-secondary" style="margin-top:10px;" onclick="navigateTo('screen-safety')">View Safety & Help</button>
+        </div>
+
+        <div id="screen-safety" class="screen">
+            <div class="brand">UniCircle</div>
+            <h1>Help & safety</h1>
+            <p>Clearer support options for urgent help.</p>
+
+            <div class="card card-danger">
+                <h2 style="color:#c62828; margin-top:0;">Immediate danger</h2>
+                <p style="color:#d32f2f; margin:0;">Mental Health Hotline: 1771<br>Police Hotline: 999</p>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-top:0;">School counselling (SIT)</h2>
+                <p class="text-sm" style="margin:0;">24-Hour Counselling Helpline:<br>6592 2030</p>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-top:0;">SOS / IMH</h2>
+                <p class="text-sm" style="margin:0;">IMH Hotline: 6389-2000</p>
+            </div>
+
+            <button class="btn-primary" style="margin-top:20px;" onclick="alert('This would open your phones native dialer.')">Call Hotline Now</button>
+            <button class="btn-secondary" style="margin-top:10px;" onclick="navigateNav('screen-quests', document.getElementById('nav-profile'))">Back to Profile</button>
+        </div>
+
+        <div id="bottom-nav">
+            <div class="nav-item active" id="nav-home" onclick="navigateNav('screen-checkin', this)">
+                <span class="nav-icon">⌂</span> Home
+            </div>
+            <div class="nav-item" id="nav-rooms" onclick="navigateNav('screen-rooms', this)">
+                <span class="nav-icon">⊞</span> Rooms
+            </div>
+            <div class="nav-item" id="nav-mentors" onclick="navigateNav('screen-mentors', this)">
+                <span class="nav-icon">◉</span> Mentor
+            </div>
+            <div class="nav-item" id="nav-ai" onclick="navigateNav('screen-ai', this)">
+                <span class="nav-icon">✦</span> AI
+            </div>
+            <div class="nav-item" id="nav-profile" onclick="navigateNav('screen-quests', this)">
+                <span class="nav-icon">☻</span> Profile
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        let appState = {
+            coins: 120,
+            inRoom: false,
+            nickname: "CloudOtter24"
+        };
+
+        // --- NAVIGATION LOGIC ---
+        function navigateTo(targetScreenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(targetScreenId).classList.add('active');
+        }
+
+        function navigateNav(targetScreenId, navElement) {
+            navigateTo(targetScreenId);
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            if(navElement) navElement.classList.add('active');
+        }
+
+        // --- SCREEN 1: CHECK-IN LOGIC ---
+        function selectMood(element) {
+            // Radio button logic for emojis
+            document.querySelectorAll('#mood-container .emoji-select').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function togglePill(element, group) {
+            // Toggle active state for pills
+            if(element.classList.contains('active')) {
+                element.classList.remove('active');
+            } else {
+                element.classList.add('active');
+            }
+        }
+
+        // --- SCREEN 2: TONE PREVIEW LOGIC ---
+        function selectTone(element, tone) {
+            document.querySelectorAll('#tone-container .btn-pill').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            
+            const preview = document.getElementById('tone-preview');
+            if(tone === 'Gentle') preview.innerText = '"You showed up today. Let\'s take one small step together."';
+            if(tone === 'Practical') preview.innerText = '"Let\'s break this task down into 3 manageable chunks."';
+            if(tone === 'Direct') preview.innerText = '"Focus mode on. Start with the hardest task for 10 minutes."';
+        }
+
+        // --- SCREEN 5: ROOM LOGIC ---
+        function joinRoom(btnElement) {
+            if(!appState.inRoom) {
+                appState.inRoom = true;
+                document.getElementById('room-pax').innerText = "19/25";
+                document.getElementById('room-detail-pax').innerText = "19 / 25 students inside";
+                btnElement.innerText = "Leave Room";
+                btnElement.style.backgroundColor = "#c62828"; // Red color
+            } else {
+                appState.inRoom = false;
+                document.getElementById('room-pax').innerText = "18/25";
+                document.getElementById('room-detail-pax').innerText = "18 / 25 students inside";
+                btnElement.innerText = "Enter room anonymously";
+                btnElement.style.backgroundColor = "#6b4eff"; // Purple color
+                navigateTo('screen-rooms'); // Kick them back to room list
+            }
+        }
+
+        // --- SCREEN 8: AI CHAT LOGIC ---
+        function switchAITone(element) {
+            document.querySelectorAll('#ai-tone-container .btn-pill').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function handleChatEnter(e) {
+            if(e.key === 'Enter') sendChatMessage();
+        }
+
+        function sendChatMessage() {
+            const inputField = document.getElementById('ai-input');
+            const message = inputField.value.trim();
+            if(message === '') return;
+
+            const chatWindow = document.getElementById('chat-window');
+            
+            // Append User Message
+            const userHTML = `<div class="chat-bubble chat-user"><p style="margin:0;">${message}</p></div>`;
+            chatWindow.insertAdjacentHTML('beforeend', userHTML);
+            inputField.value = '';
+
+            // Simulate AI Typing & Reply
+            setTimeout(() => {
+                const aiHTML = `<div class="chat-bubble chat-ai">
+                    <p style="margin:0; font-weight:bold; font-size:12px; margin-bottom:4px; color:#6b4eff;">AI Buddy</p>
+                    <p style="margin:0;">I hear you. Breaking things down is key. Want to tackle just the first step together?</p>
+                </div>`;
+                chatWindow.insertAdjacentHTML('beforeend', aiHTML);
+                chatWindow.parentElement.scrollTo(0, document.body.scrollHeight); // Auto-scroll down
+            }, 1000);
+        }
+
+        // --- SCREEN 9: GAMIFICATION LOGIC ---
+        function completeQuest(element, amount) {
+            if(element.classList.contains('quest-done')) return; // Prevent double clicking
+            
+            appState.coins += amount;
+            document.getElementById('coin-balance').innerText = `${appState.coins} Coins`;
+            
+            // Visual feedback
+            element.classList.add('quest-done');
+            element.querySelector('.btn-pill').innerText = "Done";
+            element.querySelector('.btn-pill').style.backgroundColor = "#e8f5e9";
+            element.querySelector('.btn-pill').style.color = "#2e7d32";
+        }
+
+        function buyItem(cost, itemName) {
+            if(appState.coins >= cost) {
+                appState.coins -= cost;
+                document.getElementById('coin-balance').innerText = `${appState.coins} Coins`;
+                alert(`Successfully unlocked the ${itemName}!`);
+            } else {
+                alert(`Not enough coins for the ${itemName}. Complete more quests!`);
+            }
+        }
+    </script>
+</body>
+</html>
